@@ -100,6 +100,10 @@
         <i class="fa-solid fa-utensils"></i>
         <span class="hidden sm:inline">大甲/東協</span>美食輯
       </button>
+      <button onclick="openGistModal()" title="Gist 雲端同步設定" class="px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg transition flex items-center gap-1.5 border border-emerald-200">
+        <i class="fa-brands fa-github"></i>
+        <span id="gistStatus">未同步</span>
+      </button>
       <a href="taichung-itinerary-v3.md" target="_blank" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition flex items-center gap-1.5">
         <i class="fa-solid fa-file-lines"></i>
         <span class="hidden sm:inline">Markdown</span>
@@ -292,6 +296,32 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模態框：Gist 雲端同步設定 -->
+  <div id="gistModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2"><i class="fa-brands fa-github"></i> Gist 雲端同步</h3>
+        <button onclick="closeModal('gistModal')" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-3 text-xs text-slate-600">
+        <p>打卡、筆記、目前天數一改變就自動回寫到 GitHub Gist，換裝置輸入同一組設定即可接續。</p>
+        <label class="block font-bold text-slate-700">GitHub Token（需 <code>gist</code> 權限）
+          <input id="gistTokenInput" type="password" autocomplete="off" class="mt-1 w-full p-2 rounded-lg border border-slate-200 font-normal" placeholder="ghp_... 或 github_pat_...">
+        </label>
+        <label class="block font-bold text-slate-700">Gist ID（留空則自動建立私密 Gist）
+          <input id="gistIdInput" type="text" autocomplete="off" class="mt-1 w-full p-2 rounded-lg border border-slate-200 font-normal" placeholder="例如 a1b2c3d4e5...">
+        </label>
+        <p class="text-[11px] text-slate-400">Token 只存在此瀏覽器的 localStorage，不會寫進網頁原始碼。</p>
+        <div class="flex justify-end gap-2 pt-2">
+          <button onclick="clearGistConfig()" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">清除設定</button>
+          <button onclick="saveGistConfig()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold">儲存並同步</button>
         </div>
       </div>
     </div>
@@ -679,8 +709,9 @@
 
     // 切換天數 (Day 1 / Day 2)
     function switchDay(day) {
+      const changed = currentDay !== day;
       currentDay = day;
-      localStorage.setItem('taichung_current_day', day.toString());
+      if (changed) persistState();
 
       const tab1 = document.getElementById('tabDay1');
       const tab2 = document.getElementById('tabDay2');
@@ -837,7 +868,7 @@
     // 勾選打卡完成
     function toggleSpotCheck(id) {
       checkedSpots[id] = !checkedSpots[id];
-      localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+      persistState();
       renderDay(currentDay);
     }
 
@@ -855,7 +886,7 @@
     // 儲存隨手筆記
     function saveSpotNote(id, text) {
       spotNotes[id] = text.trim();
-      localStorage.setItem('taichung_spot_notes', JSON.stringify(spotNotes));
+      persistState();
     }
 
     // 重設當天打卡進度
@@ -865,7 +896,7 @@
         spots.forEach(s => {
           delete checkedSpots[s.id];
         });
-        localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+        persistState();
         renderDay(currentDay);
       }
     }
@@ -902,6 +933,127 @@
       }
     }
 
+    // ===== Gist 雲端同步 =====
+    const GIST_FILE = 'taichung-travel-state.json';
+    let gistToken = localStorage.getItem('taichung_gist_token') || '';
+    let gistId = localStorage.getItem('taichung_gist_id') || '';
+    let gistTimer = null;
+
+    function setGistStatus(text) {
+      document.getElementById('gistStatus').innerText = text;
+    }
+
+    // 狀態改變時：寫入 localStorage，並排程回寫 Gist
+    function persistState() {
+      localStorage.setItem('taichung_current_day', currentDay.toString());
+      localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+      localStorage.setItem('taichung_spot_notes', JSON.stringify(spotNotes));
+      localStorage.setItem('taichung_updated_at', new Date().toISOString());
+      if (!gistToken) return;
+      clearTimeout(gistTimer);
+      setGistStatus('待同步…');
+      gistTimer = setTimeout(pushGist, 800);
+    }
+
+    function gistHeaders() {
+      return {
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${gistToken}`,
+        'Content-Type': 'application/json'
+      };
+    }
+
+    async function pushGist() {
+      const content = JSON.stringify({
+        currentDay, checkedSpots, spotNotes,
+        updatedAt: localStorage.getItem('taichung_updated_at')
+      }, null, 2);
+      const body = { files: { [GIST_FILE]: { content } } };
+      try {
+        setGistStatus('同步中…');
+        let res;
+        if (gistId) {
+          res = await fetch(`https://api.github.com/gists/${gistId}`, { method: 'PATCH', headers: gistHeaders(), body: JSON.stringify(body) });
+        } else {
+          body.description = '台中兩天一夜 行程打卡狀態';
+          body.public = false;
+          res = await fetch('https://api.github.com/gists', { method: 'POST', headers: gistHeaders(), body: JSON.stringify(body) });
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!gistId) {
+          gistId = data.id;
+          localStorage.setItem('taichung_gist_id', gistId);
+        }
+        setGistStatus('已同步 ' + new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }));
+      } catch (err) {
+        console.error('Gist 回寫失敗', err);
+        setGistStatus('同步失敗');
+      }
+    }
+
+    // 載入時從 Gist 取回狀態；Gist 較新就覆蓋本機
+    async function pullGist() {
+      if (!gistToken || !gistId) return false;
+      try {
+        setGistStatus('讀取中…');
+        const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: gistHeaders(), cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const file = data.files && data.files[GIST_FILE];
+        if (!file) { setGistStatus('已連線'); return false; }
+        const remote = JSON.parse(file.truncated ? await (await fetch(file.raw_url)).text() : file.content);
+        const localAt = localStorage.getItem('taichung_updated_at') || '';
+        if ((remote.updatedAt || '') >= localAt) {
+          currentDay = remote.currentDay || 1;
+          checkedSpots = remote.checkedSpots || {};
+          spotNotes = remote.spotNotes || {};
+          localStorage.setItem('taichung_current_day', currentDay.toString());
+          localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+          localStorage.setItem('taichung_spot_notes', JSON.stringify(spotNotes));
+          localStorage.setItem('taichung_updated_at', remote.updatedAt || '');
+          setGistStatus('已同步');
+          return true;
+        }
+        // 本機較新，推回 Gist
+        pushGist();
+        return false;
+      } catch (err) {
+        console.error('Gist 讀取失敗', err);
+        setGistStatus('讀取失敗');
+        return false;
+      }
+    }
+
+    function openGistModal() {
+      document.getElementById('gistTokenInput').value = gistToken;
+      document.getElementById('gistIdInput').value = gistId;
+      openModal('gistModal');
+    }
+
+    async function saveGistConfig() {
+      gistToken = document.getElementById('gistTokenInput').value.trim();
+      gistId = document.getElementById('gistIdInput').value.trim();
+      localStorage.setItem('taichung_gist_token', gistToken);
+      localStorage.setItem('taichung_gist_id', gistId);
+      closeModal('gistModal');
+      if (!gistToken) { setGistStatus('未同步'); return; }
+      if (gistId && await pullGist()) {
+        switchDay(currentDay);
+      } else if (!gistId) {
+        await pushGist();
+      }
+    }
+
+    function clearGistConfig() {
+      gistToken = ''; gistId = '';
+      localStorage.removeItem('taichung_gist_token');
+      localStorage.removeItem('taichung_gist_id');
+      document.getElementById('gistTokenInput').value = '';
+      document.getElementById('gistIdInput').value = '';
+      setGistStatus('未同步');
+    }
+
     // Modal 控制
     function openModal(id) {
       document.getElementById(id).classList.remove('hidden');
@@ -911,7 +1063,10 @@
     }
 
     // 頁面載入完成初始化
-    window.addEventListener('DOMContentLoaded', initMap);
+    window.addEventListener('DOMContentLoaded', async () => {
+      await pullGist();
+      initMap();
+    });
   </script>
 </body>
 </html>
