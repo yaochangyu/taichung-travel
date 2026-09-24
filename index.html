@@ -124,8 +124,11 @@
               <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Day 2：老城湖濱
             </button>
           </div>
-          <div class="text-right">
+          <div class="flex items-center gap-2">
             <span id="progressText" class="text-xs font-bold text-slate-600">0 / 7 完成</span>
+            <button onclick="resetProgress()" title="重設本天打卡進度" class="text-slate-400 hover:text-red-500 text-xs p-1 rounded transition">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
           </div>
         </div>
 
@@ -632,12 +635,13 @@
     };
 
     // 全域變數
-    let currentDay = 1;
+    let currentDay = parseInt(localStorage.getItem('taichung_current_day') || '1', 10);
     let map;
     let markers = [];
     let routePolyline = null;
     let showRoute = true;
     let checkedSpots = JSON.parse(localStorage.getItem('taichung_checked_spots') || '{}');
+    let spotNotes = JSON.parse(localStorage.getItem('taichung_spot_notes') || '{}');
 
     // 初始化 Leaflet 地圖
     function initMap() {
@@ -652,7 +656,7 @@
         maxZoom: 19
       }).addTo(map);
 
-      renderDay(1);
+      switchDay(currentDay);
     }
 
     // 取得自定義 Marker 顏色
@@ -676,6 +680,8 @@
     // 切換天數 (Day 1 / Day 2)
     function switchDay(day) {
       currentDay = day;
+      localStorage.setItem('taichung_current_day', day.toString());
+
       const tab1 = document.getElementById('tabDay1');
       const tab2 = document.getElementById('tabDay2');
 
@@ -706,6 +712,7 @@
 
       dayData.spots.forEach((spot, idx) => {
         const isChecked = !!checkedSpots[spot.id];
+        const savedNote = spotNotes[spot.id] || '';
         latlngs.push([spot.lat, spot.lng]);
 
         // 1. 建立地圖 Marker
@@ -760,6 +767,18 @@
 
               <h3 class="font-bold text-sm text-slate-900 leading-snug mb-1 ${isChecked ? 'line-through text-slate-500' : ''}">${spot.name}</h3>
               <p class="text-xs text-slate-600 mb-2.5 leading-relaxed">${spot.desc}</p>
+
+              <!-- 隨手筆記區塊 -->
+              <div class="mb-2 no-click">
+                <div class="flex items-center justify-between">
+                  <button onclick="toggleNoteField('${spot.id}')" class="text-[11px] text-slate-400 hover:text-slate-700 font-medium flex items-center gap-1 transition">
+                    <i class="fa-regular fa-pen-to-square"></i> ${savedNote ? '已存筆記：' + savedNote.slice(0, 10) + '...' : '＋ 隨手備忘筆記'}
+                  </button>
+                </div>
+                <div id="note-box-${spot.id}" class="${savedNote ? '' : 'hidden'} mt-1.5">
+                  <input type="text" id="note-input-${spot.id}" value="${savedNote}" placeholder="輸入自訂備忘、花費或心得..." onblur="saveSpotNote('${spot.id}', this.value)" class="w-full text-xs p-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-sky-400 text-slate-700" />
+                </div>
+              </div>
               
               <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-500">
                 <div class="flex items-center gap-1 text-[11px] font-medium text-slate-600">
@@ -820,6 +839,35 @@
       checkedSpots[id] = !checkedSpots[id];
       localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
       renderDay(currentDay);
+    }
+
+    // 展開/收合筆記輸入框
+    function toggleNoteField(id) {
+      const box = document.getElementById(`note-box-${id}`);
+      if (box) {
+        box.classList.toggle('hidden');
+        if (!box.classList.contains('hidden')) {
+          document.getElementById(`note-input-${id}`).focus();
+        }
+      }
+    }
+
+    // 儲存隨手筆記
+    function saveSpotNote(id, text) {
+      spotNotes[id] = text.trim();
+      localStorage.setItem('taichung_spot_notes', JSON.stringify(spotNotes));
+    }
+
+    // 重設當天打卡進度
+    function resetProgress() {
+      if (confirm(`確定要重設 Day ${currentDay} 的所有打卡進度嗎？`)) {
+        const spots = itineraryData[currentDay].spots;
+        spots.forEach(s => {
+          delete checkedSpots[s.id];
+        });
+        localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+        renderDay(currentDay);
+      }
     }
 
     // 更新進度條
