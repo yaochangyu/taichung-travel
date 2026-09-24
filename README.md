@@ -6,17 +6,29 @@
 
 ---
 
+## 🌐 線上互動地圖與行程導覽 (GitHub Pages)
+
+* 🚀 **即時線上瀏覽與打卡**：[https://yaochangyu.github.io/taichung-travel/](https://yaochangyu.github.io/taichung-travel/)
+  * 支援手機與電腦版響應式介面
+  * 互動式 Leaflet 雙向連動地圖與路徑線
+  * Day 1（大甲海線）/ Day 2（老城湖濱）即時行程打卡與進度追蹤
+  * 內建高鐵/台鐵完整車次時刻表與大甲/東協美食特輯
+
+---
+
 ## 📑 專案核心檔案目錄
 
-本專案將**「具體行程排程表」**與**「景點美食資料庫」**解耦分開維護，提供兩版不同風格的順暢行程：
+本專案將**「具體行程排程表」**與**「景點美食資料庫」**解耦分開維護：
 
 | 檔案名稱 | 類型 | 核心內容與定位 |
 | :--- | :--- | :--- |
+| [**`index.html`**](./index.html) | 🌐 互動網頁 | **【線上互動行程地圖】** 整合 v3 兩天一夜行程、Leaflet 地圖、打卡進度、車次表與繁中導航。 |
+| [**`taichung-itinerary-v3.md`**](./taichung-itinerary-v3.md) | 📅 行程表（海線老城版） | **【大甲海線 ＋ 老城湖濱版】** Day 1 大甲媽祖美食、阿聰師文化館、東協廣場南洋料理；Day 2 公園大麵羹、中央書局、富興工廠、星泉湖、LaLaport、綠川藍調夜景與宮原眼科。 |
 | [**`taichung-itinerary-v2.md`**](./taichung-itinerary-v2.md) | 📅 行程表（推薦版） | **【極致順暢版】** 包含公園路大麵羹早餐、國家漫畫博物館（貓貓蟲咖波）、第四市場/LaLaport、週五旱溪夜市。一路向東無折返！ |
 | [**`taichung-itinerary-v1.md`**](./taichung-itinerary-v1.md) | 📅 行程表（經典版） | **【一中商圈夜市版】** 包含范記金之園草袋飯、自強號咖啡、第四市場、週五一中街夜市、週六第五市場早市美食。 |
-| [**`taichung-attractions.md`**](./taichung-attractions.md) | 📍 景點資料庫 | **【景點美食全名單】** 完整收錄舊城核心景點、台中市區六大市場、Threads/IG 熱門打卡、LaLaport、台中特有美食（麻芛/大麵羹/檸檬餅/珍奶創始）與台中 7 大夜市清單。 |
-| [**`taichung-spots.json`**](./taichung-spots.json) | 💾 資料檔案 | **【結構化地理資料庫】** 包含所有地點的 `lat` / `lng` 數值座標、地址、營業時間與 `v1`/`v2` 時間序列資料，供程式或地圖渲染讀取。 |
-| [**`CLAUDE.md`**](./CLAUDE.md) | 🤖 專案指引 | **【AI Agent 協作規範】** 明確規定檔案用途、禁止隨意合併，以及搜尋景點必須強制標註 Google Maps 經緯度與導航連結之硬性規則。 |
+| [**`taichung-attractions.md`**](./taichung-attractions.md) | 📍 景點資料庫 | **【景點美食全名單】** 完整收錄大甲海線小吃、東協廣場南洋料理、舊城景點、台中市區六大市場、Threads/IG 熱門打卡、LaLaport、台中特有美食與 7 大夜市清單。 |
+| [**`taichung-spots.json`**](./taichung-spots.json) | 💾 資料檔案 | **【結構化地理資料庫】** 包含所有地點的 `lat` / `lng` 數值座標、地址、營業時間與時間序列資料，供程式或地圖渲染讀取。 |
+| [**`CLAUDE.md`**](./CLAUDE.md) | 🤖 專案指引 | **【AI Agent 協作規範】** 明確規定檔案用途、禁止隨意合併，以及搜尋景點必須強制標註 Google Maps 繁中經緯度與導航連結之硬性規則。 |
 
 ---
 
