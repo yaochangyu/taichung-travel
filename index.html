@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台中兩天一夜互動式行程導覽 (v3 順暢極致版)</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+            },
+            accent: {
+              500: '#f59e0b',
+              600: '#d97706',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;900&display=swap');
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      padding: 4px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    }
+    .pulse-marker {
+      animation: pulse-ring 2s infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(2, 132, 199, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden">
+
+  <!-- 頂部導覽列 Header -->
+  <header class="bg-white border-b border-slate-200 px-4 py-3 shrink-0 flex items-center justify-between shadow-sm z-30">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-sky-400 flex items-center justify-center text-white shadow-md shadow-sky-100">
+        <i class="fa-solid fa-map-location-dot text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-slate-900 leading-tight">台中兩天一夜 互動行程導覽</h1>
+        <p class="text-xs text-slate-500 font-medium flex items-center gap-2">
+          <span><i class="fa-solid fa-train-subway text-sky-600"></i> v3 順暢極致版</span>
+          <span class="w-1 h-1 bg-slate-300 rounded-full"></span>
+          <span>大甲海線 ＋ 老城湖濱</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- 頂部操作按鈕 -->
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('timetableModal')" class="px-3 py-1.5 text-xs font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-lg transition flex items-center gap-1.5 border border-sky-200">
+        <i class="fa-solid fa-clock"></i>
+        <span class="hidden sm:inline">火車/高鐵</span>班次表
+      </button>
+      <button onclick="openModal('foodModal')" class="px-3 py-1.5 text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition flex items-center gap-1.5 border border-amber-200">
+        <i class="fa-solid fa-utensils"></i>
+        <span class="hidden sm:inline">大甲/東協</span>美食輯
+      </button>
+      <a href="taichung-itinerary-v3.md" target="_blank" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition flex items-center gap-1.5">
+        <i class="fa-solid fa-file-lines"></i>
+        <span class="hidden sm:inline">Markdown</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- 主體內容區 (左側時間軸 + 右側互動地圖) -->
+  <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+    <!-- 左側邊欄：行程切換與時間軸 -->
+    <div class="w-full md:w-[480px] lg:w-[520px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full z-10 shadow-lg md:shadow-none">
+      
+      <!-- 天數切換 Tab 與進度條 -->
+      <div class="p-4 border-b border-slate-100 bg-slate-50/70 shrink-0">
+        <div class="flex items-center justify-between mb-3">
+          <div class="inline-flex p-1 bg-slate-200/80 rounded-xl">
+            <button id="tabDay1" onclick="switchDay(1)" class="px-4 py-1.5 rounded-lg text-xs font-bold transition shadow-sm bg-white text-brand-700 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-sky-500"></span>Day 1：大甲海線
+            </button>
+            <button id="tabDay2" onclick="switchDay(2)" class="px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>Day 2：老城湖濱
+            </button>
+          </div>
+          <div class="text-right">
+            <span id="progressText" class="text-xs font-bold text-slate-600">0 / 7 完成</span>
+          </div>
+        </div>
+
+        <!-- 進度條 -->
+        <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+          <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-brand-600 h-full transition-all duration-300 rounded-full" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- 快速關鍵心法提示 -->
+      <div id="dayTips" class="px-4 py-2.5 bg-sky-50 border-b border-sky-100 text-xs text-sky-900 flex items-start gap-2">
+        <i class="fa-solid fa-circle-info text-sky-600 mt-0.5 shrink-0"></i>
+        <span id="dayTipContent">Day 1：高鐵抵達後直接在新烏日站轉乘海線 2608 次直達大甲，免進市區塞車！</span>
+      </div>
+
+      <!-- 行程列表清單 (可滾動) -->
+      <div id="timelineContainer" class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3 pb-24 md:pb-6">
+        <!-- 動態由 JavaScript 產生 -->
+      </div>
+    </div>
+
+    <!-- 右側：互動式地圖 (Leaflet) -->
+    <div class="flex-1 h-[40vh] md:h-full relative z-0">
+      <div id="map" class="w-full h-full"></div>
+      
+      <!-- 地圖浮動控制器 -->
+      <div class="absolute top-4 right-4 z-[400] flex flex-col gap-2 bg-white/95 backdrop-blur rounded-xl p-2 shadow-md border border-slate-200 text-xs">
+        <button onclick="resetMapView()" class="px-2.5 py-1.5 hover:bg-slate-100 rounded-lg text-slate-700 font-medium flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-compress text-brand-600"></i> 總覽全地圖
+        </button>
+        <button onclick="toggleRouteLine()" class="px-2.5 py-1.5 hover:bg-slate-100 rounded-lg text-slate-700 font-medium flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-route text-emerald-600"></i> 切換路徑線
+        </button>
+      </div>
+
+      <!-- 地圖底部圖例 -->
+      <div class="absolute bottom-4 left-4 z-[400] bg-white/95 backdrop-blur px-3 py-2 rounded-xl shadow-md border border-slate-200 text-xs flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span>
+          <span class="text-slate-700 font-medium">Day 1 站點</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+          <span class="text-slate-700 font-medium">Day 2 站點</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+          <span class="text-slate-700 font-medium">住宿/交通樞紐</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模態框 1：完整車次時刻表 Modal -->
+  <div id="timetableModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-train"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">完整火車與高鐵車次時刻表</h3>
+            <p class="text-xs text-slate-500">v3 精選車次、備選方案與票價對照</p>
+          </div>
+        </div>
+        <button onclick="closeModal('timetableModal')" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto custom-scrollbar space-y-4">
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              <tr>
+                <th class="p-2.5">乘車區間</th>
+                <th class="p-2.5">車次編號</th>
+                <th class="p-2.5">時間 / 車程</th>
+                <th class="p-2.5">票價 / 座席</th>
+                <th class="p-2.5">用途建議</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600 font-medium">
+              <tr class="bg-sky-50/50">
+                <td class="p-2.5 font-bold text-sky-900">台北 ➔ 台中</td>
+                <td class="p-2.5 font-bold text-sky-700">高鐵 1213</td>
+                <td class="p-2.5">09:51 - 10:38 (47m)</td>
+                <td class="p-2.5">10-12 自由座</td>
+                <td class="p-2.5 text-sky-700 font-bold">★ 去程首選</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">台北 ➔ 台中</td>
+                <td class="p-2.5">高鐵 1307</td>
+                <td class="p-2.5">10:01 - 10:52 (51m)</td>
+                <td class="p-2.5">09-12 自由座</td>
+                <td class="p-2.5 text-slate-500">去程備選</td>
+              </tr>
+              <tr class="bg-amber-50/50">
+                <td class="p-2.5 font-bold text-amber-900">新烏日 ➔ 大甲</td>
+                <td class="p-2.5 font-bold text-amber-700">台鐵 2608 區間</td>
+                <td class="p-2.5">11:31 - 12:21 (50m)</td>
+                <td class="p-2.5">全 $73 / 半 $37</td>
+                <td class="p-2.5 text-amber-700 font-bold">★ 海線首選</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">新烏日 ➔ 大甲</td>
+                <td class="p-2.5">台鐵 2606 區間</td>
+                <td class="p-2.5">09:50 - 10:40 (50m)</td>
+                <td class="p-2.5">全 $73 / 半 $37</td>
+                <td class="p-2.5 text-slate-500">海線早班</td>
+              </tr>
+              <tr class="bg-sky-50/50">
+                <td class="p-2.5 font-bold text-sky-900">大甲 ➔ 台中車站</td>
+                <td class="p-2.5 font-bold text-sky-700">台鐵 2621 區間</td>
+                <td class="p-2.5">15:36 - 16:37 (1h1m)</td>
+                <td class="p-2.5">全 $91 / 半 $46</td>
+                <td class="p-2.5 text-sky-700 font-bold">★ 進市區首選</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">大甲 ➔ 台中車站</td>
+                <td class="p-2.5">台鐵 2623 區間</td>
+                <td class="p-2.5">16:30 - 17:32 (1h2m)</td>
+                <td class="p-2.5">全 $91 / 半 $46</td>
+                <td class="p-2.5 text-slate-500">進市區備選 1</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">大甲 ➔ 台中車站</td>
+                <td class="p-2.5">台鐵 2627 區間</td>
+                <td class="p-2.5">18:32 - 19:31 (59m)</td>
+                <td class="p-2.5">全 $91 / 半 $46</td>
+                <td class="p-2.5 text-slate-500">進市區備選 2</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">大甲 ➔ 台中車站</td>
+                <td class="p-2.5">台鐵 2631 區間</td>
+                <td class="p-2.5">20:07 - 21:11 (1h4m)</td>
+                <td class="p-2.5">全 $91 / 半 $46</td>
+                <td class="p-2.5 text-slate-500">海線夜遊晚班</td>
+              </tr>
+              <tr class="bg-emerald-50/50">
+                <td class="p-2.5 font-bold text-emerald-900">台中 ➔ 新烏日</td>
+                <td class="p-2.5 font-bold text-emerald-700">台鐵 2027 區間</td>
+                <td class="p-2.5">19:15 - 19:24 (9m)</td>
+                <td class="p-2.5">區間票價</td>
+                <td class="p-2.5 text-emerald-700 font-bold">★ 返程接駁首選</td>
+              </tr>
+              <tr>
+                <td class="p-2.5">台中 ➔ 新烏日</td>
+                <td class="p-2.5">台鐵 2233 區間</td>
+                <td class="p-2.5">19:26 - 19:37 (11m)</td>
+                <td class="p-2.5">區間票價</td>
+                <td class="p-2.5 text-slate-500">返程接駁備選</td>
+              </tr>
+              <tr class="bg-purple-50/50">
+                <td class="p-2.5 font-bold text-purple-900">台中 ➔ 台北</td>
+                <td class="p-2.5 font-bold text-purple-700">高鐵列車</td>
+                <td class="p-2.5">20:08 - 20:54 (46m)</td>
+                <td class="p-2.5">高鐵票價</td>
+                <td class="p-2.5 text-purple-700 font-bold">★ 返抵台北</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模態框 2：特色美食清單 Modal -->
+  <div id="foodModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200">
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+            <i class="fa-solid fa-bowl-food"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-base">大甲廟前 ＆ 東協廣場 美食特輯</h3>
+            <p class="text-xs text-slate-500">在地老饕口碑與必點菜色</p>
+          </div>
+        </div>
+        <button onclick="closeModal('foodModal')" class="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto custom-scrollbar space-y-6">
+        <!-- 大甲小吃 -->
+        <div>
+          <h4 class="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-amber-500"></span>【大甲鎮瀾宮商圈美食】
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">一品香水煎包</span>
+              <p class="text-slate-600 mt-1">皮薄餡多酥脆，夏季限定「瓠瓜水煎包」清甜多汁，多汁豬肉餡餅超讚。</p>
+              <span class="text-slate-400 mt-2 block">育德路58號 (05:30-18:30)</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">康家阿媽ㄟ粉腸</span>
+              <p class="text-slate-600 mt-1">番薯粉+新鮮豬肉半煎炸，外皮 Q 彈焦香，靈魂為特製蒜蓉辣醬。</p>
+              <span class="text-slate-400 mt-2 block">蔣公路131號門口</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">嘉家樂肉圓</span>
+              <p class="text-slate-600 mt-1">50年老店，可選「Q皮」或超酥「脆皮」，整塊肉排筍丁內餡配苦瓜肉湯。</p>
+              <span class="text-slate-400 mt-2 block">蔣公路166號</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">五甲地香酥芋泥球</span>
+              <p class="text-slate-600 mt-1">現點現炸，內餡大甲芋泥綿密低甜度，推薦起司或蛋黃鹹甜口味。</p>
+              <span class="text-slate-400 mt-2 block">蔣公路118號旁攤位</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">大甲芋香包</span>
+              <p class="text-slate-600 mt-1">現場吃淋上特製花生粉辣醬與菜脯，滿滿扎實芋頭絲。</p>
+              <span class="text-slate-400 mt-2 block">蔣公路121號 (13:00-17:00)</span>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">碳烤玉米</span>
+              <p class="text-slate-600 mt-1">三支 100 元，炭香撲鼻、醬汁鹹甜濃郁。</p>
+              <span class="text-slate-400 mt-2 block">蔣公路周邊</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 東協廣場美食 -->
+        <div>
+          <h4 class="font-bold text-sm text-slate-900 mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>【東協廣場南洋異國料理】
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">越香法國麵包 (1F)</span>
+              <p class="text-slate-600 mt-1">現烤金黃法棍，夾扎肉、烤豬肉片、雞肝醬與酸甜醃紅白蘿蔔絲。</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">阿杜泰式料理 (3F)</span>
+              <p class="text-slate-600 mt-1">必點泰式炒粿條 Pad Thai (NT$130-160) 與香辣打拋豬。</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">WARUNG PAK E (綠川西街178號)</span>
+              <p class="text-slate-600 mt-1">高CP值印尼名店，招牌焦香沙嗲肉串配濃郁花生醬、下飯神菜巴東牛肉。</p>
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="font-bold text-slate-900 text-sm">泰媽媽小廚房 (3F)</span>
+              <p class="text-slate-600 mt-1">現拌爽脆酸辣青木瓜沙拉 (NT$100-150)，消暑開胃神器。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 行程資料集 (Day 1 & Day 2)
+    const itineraryData = {
+      1: {
+        title: "Day 1：大甲海線小吃巡禮、芋頭文化館 ＆ 東協廣場南洋風情",
+        tip: "Day 1：高鐵抵達後直接在共構新烏日站轉乘海線 2608 次直達大甲，免進市區塞車！",
+        spots: [
+          {
+            id: "d1-1",
+            time: "09:51 - 10:38",
+            name: "高鐵 1213 次（台北 ➔ 台中）",
+            category: "transport",
+            categoryName: "高鐵南下",
+            lat: 24.111803,
+            lng: 120.615376,
+            transportType: "高鐵",
+            transportTime: "車程 47 分鐘",
+            desc: "台北 09:51 發車，10-12 車廂為自由座；10:38 抵達後走室內連通道至台鐵新烏日站。(備選 1307次 10:01-10:52)",
+            googleUrl: "https://maps.google.com/?q=24.111803,120.615376&hl=zh-TW"
+          },
+          {
+            id: "d1-2",
+            time: "11:31 - 12:21",
+            name: "台鐵海線 2608 次（新烏日 ➔ 大甲）",
+            category: "transport",
+            categoryName: "台鐵海線",
+            lat: 24.344774,
+            lng: 120.626739,
+            transportType: "台鐵區間車",
+            transportTime: "車程 50 分鐘",
+            desc: "全票 $73 / 半票 $37。海線直達大甲火車站，出站即為熱鬧大甲市區。(備選 2606次 09:50-10:40)",
+            googleUrl: "https://maps.google.com/?q=24.344774,120.626739&hl=zh-TW"
+          },
+          {
+            id: "d1-3",
+            time: "12:30 - 14:15",
+            name: "大甲鎮瀾宮 ＆ 廟前美食巡禮",
+            category: "food",
+            categoryName: "信仰與小吃",
+            lat: 24.345626,
+            lng: 120.623460,
+            transportType: "步行",
+            transportTime: "大甲站步行 5 分鐘",
+            desc: "參拜大甲媽祖。必吃：一品香水煎包/瓠瓜包、康家阿媽半煎炸粉腸佐蒜蓉醬、嘉家樂脆皮肉圓、香酥芋泥球、大甲芋香包與烤玉米。",
+            googleUrl: "https://maps.google.com/?q=24.345626,120.623460&hl=zh-TW"
+          },
+          {
+            id: "d1-4",
+            time: "14:30 - 15:15",
+            name: "阿聰師芋頭文化館（觀光工廠）",
+            category: "sight",
+            categoryName: "觀光工廠",
+            lat: 24.346397,
+            lng: 120.602193,
+            transportType: "Ubike 2.0 / 步行",
+            transportTime: "騎單車 10-12 分鐘 (2.3km)",
+            desc: "免門票參觀！巨型書牆打卡、免費試吃芋頭酥與餅乾、現磨咖啡與熱茶免費喝，享用消暑芋冰與伴手禮。",
+            googleUrl: "https://maps.google.com/?q=24.346397,120.602193&hl=zh-TW"
+          },
+          {
+            id: "d1-5",
+            time: "15:36 - 16:37",
+            name: "台鐵 2621 次（大甲 ➔ 台中車站）",
+            category: "transport",
+            categoryName: "鐵路返市區",
+            lat: 24.137891,
+            lng: 120.684425,
+            transportType: "台鐵區間車",
+            transportTime: "車程 1 小時 01 分",
+            desc: "全票 $91 / 半票 $46。直達台中火車站前站。(備選班次：2623次 16:30 / 2627次 18:32 / 2631次 20:07)",
+            googleUrl: "https://maps.google.com/?q=24.137891,120.684425&hl=zh-TW"
+          },
+          {
+            id: "d1-6",
+            time: "16:45 - 19:30",
+            name: "東協廣場（台中小東南亞美食）",
+            category: "food",
+            categoryName: "南洋異國料理",
+            lat: 24.139390,
+            lng: 120.683808,
+            transportType: "步行",
+            transportTime: "台中站前站步行 8 分鐘",
+            desc: "走逛東協大樓！必吃：越香法國麵包(1F)、阿杜泰式炒粿條/打拋豬(3F)、WARUNG PAK E/巴東沙嗲串燒配花生醬、泰媽媽青木瓜沙拉。",
+            googleUrl: "https://maps.google.com/?q=24.139390,120.683808&hl=zh-TW"
+          },
+          {
+            id: "d1-7",
+            time: "19:30 - 20:00",
+            name: "博奇大飯店（Check-in 入住）",
+            category: "hotel",
+            categoryName: "住宿休息",
+            lat: 24.140401,
+            lng: 120.685566,
+            transportType: "步行",
+            transportTime: "東協廣場步行 5 分鐘",
+            desc: "辦理入住、洗漱歇腳。晚間可自由在雙十路、台中公園或綠川夜間漫步。",
+            googleUrl: "https://maps.google.com/?q=24.140401,120.685566&hl=zh-TW"
+          }
+        ]
+      },
+      2: {
+        title: "Day 2：老城洋樓、後站文創、湖濱生態 ＆ 綠川藍調散步",
+        tip: "Day 2：11:00 退房時行李交給博奇櫃檯保管，傍晚 18:35 逛完宮原眼科順路走 5 分鐘回飯店取行李，省錢又從容！",
+        spots: [
+          {
+            id: "d2-1",
+            time: "11:00 - 11:10",
+            name: "博奇大飯店（退房 ＆ 寄存行李）",
+            category: "hotel",
+            categoryName: "行李保管",
+            lat: 24.140401,
+            lng: 120.685566,
+            transportType: "飯店櫃檯",
+            transportTime: "辦理 10 分鐘",
+            desc: "三只登機箱交給櫃檯免費保管，兩手空空出發享用傳統午餐。",
+            googleUrl: "https://maps.google.com/?q=24.140401,120.685566&hl=zh-TW"
+          },
+          {
+            id: "d2-2",
+            time: "11:10 - 11:55",
+            name: "公園路大麵羹（必比登推薦）",
+            category: "food",
+            categoryName: "台中特色早午餐",
+            lat: 24.143700,
+            lng: 120.684100,
+            transportType: "步行",
+            transportTime: "博奇步行 6-8 分鐘 (500m)",
+            desc: "米其林必比登推薦！粗圓大麵羹口感滑順，搭配炸燒肉、油豆腐與粉腸，必淋東泉辣椒醬。",
+            googleUrl: "https://maps.google.com/?q=24.1437,120.6841&hl=zh-TW"
+          },
+          {
+            id: "d2-3",
+            time: "12:05 - 13:05",
+            name: "中央書局（1927 日治老洋樓）",
+            category: "sight",
+            categoryName: "歷史文化洋樓",
+            lat: 24.140759,
+            lng: 120.681165,
+            transportType: "步行",
+            transportTime: "大麵羹步行 8 分鐘 (600m)",
+            desc: "避開正午烈日，走進優雅白色圓弧洋樓，翻閱台灣在地選書、欣賞當季文化展覽。",
+            googleUrl: "https://maps.google.com/?q=24.140759,120.681165&hl=zh-TW"
+          },
+          {
+            id: "d2-4",
+            time: "13:15 - 14:05",
+            name: "富興工廠 1962（文創聚落）",
+            category: "sight",
+            categoryName: "老化妝品廠改建",
+            lat: 24.135084,
+            lng: 120.683619,
+            transportType: "步行",
+            transportTime: "中央書局穿站步行 10 分鐘",
+            desc: "60年歷史「盛香堂」工廠改造，挑高中庭天井拍美照，走逛古著、黑膠與底片相機聚落。",
+            googleUrl: "https://maps.google.com/?q=24.135084,120.683619&hl=zh-TW"
+          },
+          {
+            id: "d2-5",
+            time: "14:10 - 15:10",
+            name: "帝國製糖廠 ＆ 星泉湖步道",
+            category: "sight",
+            categoryName: "湖濱生態古蹟",
+            lat: 24.138867,
+            lng: 120.693538,
+            transportType: "步行",
+            transportTime: "富興工廠步行 5 分鐘 (400m)",
+            desc: "1935 年日治糖廠建築內部展館，漫步星泉湖畔木棧道，遠眺現代建築湖面倒影。",
+            googleUrl: "https://maps.google.com/?q=24.138867,120.693538&hl=zh-TW"
+          },
+          {
+            id: "d2-6",
+            time: "15:15 - 17:30",
+            name: "Mitsui Shopping Park LaLaport 台中",
+            category: "sight",
+            categoryName: "大型日系商場",
+            lat: 24.140496,
+            lng: 120.692468,
+            transportType: "步行",
+            transportTime: "帝國糖廠過馬路 2 分鐘",
+            desc: "走逛北館與南館日系品牌、LOPIA 超市、吹冷氣採買，並在咖啡廳享用愜意下午茶。",
+            googleUrl: "https://maps.google.com/?q=24.140496,120.692468&hl=zh-TW"
+          },
+          {
+            id: "d2-7",
+            time: "17:45 - 18:15",
+            name: "★ 綠川水岸廊道（藍調小京都）",
+            category: "sight",
+            categoryName: "親水夜景步道",
+            lat: 24.138296,
+            lng: 120.683371,
+            transportType: "步行",
+            transportTime: "LaLaport 步行 12-15 分鐘",
+            desc: "18:00 日落藍調時刻，景觀水岸燈光全數點亮，石階步道潺潺流水，宛如京都鴨川夜景。",
+            googleUrl: "https://maps.google.com/?q=24.138296,120.683371&hl=zh-TW"
+          },
+          {
+            id: "d2-8",
+            time: "18:15 - 18:35",
+            name: "宮原眼科（挑高木書牆採買）",
+            category: "food",
+            categoryName: "日治古蹟與伴手禮",
+            lat: 24.137825,
+            lng: 120.683600,
+            transportType: "步行",
+            transportTime: "綠川步道跨出 1 分鐘",
+            desc: "不排隊吃冰，純粹走入大廳欣賞如魔法學院般的挑高木書牆與精緻老建築，挑選日出土鳳梨酥。",
+            googleUrl: "https://maps.google.com/?q=24.137825,120.683600&hl=zh-TW"
+          },
+          {
+            id: "d2-9",
+            time: "18:35 - 18:45",
+            name: "博奇大飯店（領取行李）",
+            category: "hotel",
+            categoryName: "取行李",
+            lat: 24.140401,
+            lng: 120.685566,
+            transportType: "步行",
+            transportTime: "宮原沿綠川步行 5-6 分鐘 (450m)",
+            desc: "順著綠川步道走回飯店櫃檯領取三只登機箱，稍作整理歇腳。",
+            googleUrl: "https://maps.google.com/?q=24.140401,120.685566&hl=zh-TW"
+          },
+          {
+            id: "d2-10",
+            time: "18:45 - 19:26",
+            name: "台中車站 ➔ 台鐵 2027 次 ➔ 新烏日",
+            category: "transport",
+            categoryName: "台鐵接駁高鐵",
+            lat: 24.137891,
+            lng: 120.684425,
+            transportType: "步行 + 台鐵區間車",
+            transportTime: "步行 7-8m + 車程 9m",
+            desc: "18:55 抵達火車站，19:05 進月台候車。19:15 發車直達新烏日站 (19:24 抵達)。(備選 2233次 19:26-19:37)",
+            googleUrl: "https://maps.google.com/?q=24.137891,120.684425&hl=zh-TW"
+          },
+          {
+            id: "d2-11",
+            time: "20:08 - 20:54",
+            name: "高鐵台中 ➔ 台北車站",
+            category: "transport",
+            categoryName: "高鐵北上返程",
+            lat: 24.111803,
+            lng: 120.615376,
+            transportType: "高鐵列車",
+            transportTime: "車程 46 分鐘",
+            desc: "經連通道進高鐵閘門，留有 35 分鐘以上餘裕候車。20:08 發車，20:54 準時返抵台北！",
+            googleUrl: "https://maps.google.com/?q=24.111803,120.615376&hl=zh-TW"
+          }
+        ]
+      }
+    };
+
+    // 全域變數
+    let currentDay = 1;
+    let map;
+    let markers = [];
+    let routePolyline = null;
+    let showRoute = true;
+    let checkedSpots = JSON.parse(localStorage.getItem('taichung_checked_spots') || '{}');
+
+    // 初始化 Leaflet 地圖
+    function initMap() {
+      // 預設中心設在台中中區
+      map = L.map('map', {
+        zoomControl: true
+      }).setView([24.1388, 120.6844], 14);
+
+      // 加入 OpenStreetMap 圖層
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+      }).addTo(map);
+
+      renderDay(1);
+    }
+
+    // 取得自定義 Marker 顏色
+    function getMarkerIcon(category, day, isChecked) {
+      let bg = day === 1 ? '#0284c7' : '#10b981';
+      if (category === 'hotel') bg = '#f59e0b';
+      if (category === 'transport') bg = '#6366f1';
+      if (isChecked) bg = '#94a3b8';
+
+      return L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="background-color: ${bg};" class="w-7 h-7 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold ${isChecked ? 'opacity-70' : 'pulse-marker'}">
+                <i class="fa-solid ${category === 'food' ? 'fa-utensils' : category === 'hotel' ? 'fa-hotel' : category === 'transport' ? 'fa-train' : 'fa-camera'}"></i>
+               </div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
+      });
+    }
+
+    // 切換天數 (Day 1 / Day 2)
+    function switchDay(day) {
+      currentDay = day;
+      const tab1 = document.getElementById('tabDay1');
+      const tab2 = document.getElementById('tabDay2');
+
+      if (day === 1) {
+        tab1.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition shadow-sm bg-white text-brand-700 flex items-center gap-1.5";
+        tab2.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900 flex items-center gap-1.5";
+      } else {
+        tab2.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition shadow-sm bg-white text-emerald-700 flex items-center gap-1.5";
+        tab1.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition text-slate-600 hover:text-slate-900 flex items-center gap-1.5";
+      }
+
+      document.getElementById('dayTipContent').innerText = itineraryData[day].tip;
+      renderDay(day);
+    }
+
+    // 渲染指定天數的列表與地圖標記
+    function renderDay(day) {
+      const container = document.getElementById('timelineContainer');
+      container.innerHTML = '';
+
+      // 清除舊地圖標記與折線
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+      if (routePolyline) map.removeLayer(routePolyline);
+
+      const dayData = itineraryData[day];
+      const latlngs = [];
+
+      dayData.spots.forEach((spot, idx) => {
+        const isChecked = !!checkedSpots[spot.id];
+        latlngs.push([spot.lat, spot.lng]);
+
+        // 1. 建立地圖 Marker
+        const marker = L.marker([spot.lat, spot.lng], {
+          icon: getMarkerIcon(spot.category, day, isChecked)
+        }).addTo(map);
+
+        const popupContent = `
+          <div class="p-2 min-w-[200px]">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-1.5 mb-1.5">
+              <span class="text-xs font-bold text-slate-500">${spot.time}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${spot.category === 'food' ? 'bg-amber-100 text-amber-800' : spot.category === 'transport' ? 'bg-indigo-100 text-indigo-800' : 'bg-sky-100 text-sky-800'}">${spot.categoryName}</span>
+            </div>
+            <h4 class="font-bold text-sm text-slate-900 leading-snug mb-1">${spot.name}</h4>
+            <p class="text-xs text-slate-600 mb-2 leading-relaxed">${spot.desc}</p>
+            <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+              <span><i class="fa-solid fa-person-walking text-slate-400 mr-1"></i>${spot.transportTime}</span>
+              <a href="${spot.googleUrl}" target="_blank" class="font-bold text-sky-600 hover:text-sky-800 flex items-center gap-1">
+                <i class="fa-solid fa-location-arrow"></i> 繁中導航
+              </a>
+            </div>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+        marker.on('click', () => {
+          highlightCard(spot.id);
+        });
+        markers.push(marker);
+
+        // 2. 建立時間軸卡片 HTML
+        const card = document.createElement('div');
+        card.id = `card-${spot.id}`;
+        card.className = `p-3.5 rounded-2xl border transition duration-200 cursor-pointer ${isChecked ? 'bg-slate-100/80 border-slate-200 opacity-75' : 'bg-white border-slate-200 hover:border-sky-300 hover:shadow-md'}`;
+        card.onclick = (e) => {
+          if (!e.target.closest('.no-click')) {
+            focusSpot(spot.lat, spot.lng, marker);
+          }
+        };
+
+        card.innerHTML = `
+          <div class="flex items-start gap-3">
+            <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSpotCheck('${spot.id}')" class="no-click mt-1 w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300 cursor-pointer shrink-0">
+            
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-xs font-bold text-brand-600">${spot.time}</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${spot.category === 'food' ? 'bg-amber-50 text-amber-700 border border-amber-200' : spot.category === 'transport' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : spot.category === 'hotel' ? 'bg-orange-50 text-orange-700 border border-orange-200' : 'bg-sky-50 text-sky-700 border border-sky-200'}">
+                  ${spot.categoryName}
+                </span>
+              </div>
+
+              <h3 class="font-bold text-sm text-slate-900 leading-snug mb-1 ${isChecked ? 'line-through text-slate-500' : ''}">${spot.name}</h3>
+              <p class="text-xs text-slate-600 mb-2.5 leading-relaxed">${spot.desc}</p>
+              
+              <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100 text-slate-500">
+                <div class="flex items-center gap-1 text-[11px] font-medium text-slate-600">
+                  <i class="fa-solid fa-route text-sky-500"></i>
+                  <span>${spot.transportType}（${spot.transportTime}）</span>
+                </div>
+                <a href="${spot.googleUrl}" target="_blank" class="no-click text-sky-600 hover:text-sky-800 font-bold text-[11px] flex items-center gap-1 bg-sky-50 hover:bg-sky-100 px-2 py-1 rounded-md transition">
+                  <i class="fa-solid fa-map-pin"></i> 繁中導航
+                </a>
+              </div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+      // 3. 繪製動線路徑
+      if (showRoute && latlngs.length > 0) {
+        routePolyline = L.polyline(latlngs, {
+          color: day === 1 ? '#0284c7' : '#10b981',
+          weight: 4,
+          opacity: 0.7,
+          dashArray: '8, 8'
+        }).addTo(map);
+      }
+
+      // 自動縮放至合適視野
+      if (latlngs.length > 0) {
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+      }
+
+      updateProgress();
+    }
+
+    // 聚焦地圖點位並展開 Popup
+    function focusSpot(lat, lng, marker) {
+      map.flyTo([lat, lng], 16, { animate: true, duration: 1 });
+      setTimeout(() => {
+        marker.openPopup();
+      }, 500);
+    }
+
+    // 高亮左側卡片
+    function highlightCard(id) {
+      const card = document.getElementById(`card-${id}`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('ring-2', 'ring-sky-500');
+        setTimeout(() => {
+          card.classList.remove('ring-2', 'ring-sky-500');
+        }, 1500);
+      }
+    }
+
+    // 勾選打卡完成
+    function toggleSpotCheck(id) {
+      checkedSpots[id] = !checkedSpots[id];
+      localStorage.setItem('taichung_checked_spots', JSON.stringify(checkedSpots));
+      renderDay(currentDay);
+    }
+
+    // 更新進度條
+    function updateProgress() {
+      const daySpots = itineraryData[currentDay].spots;
+      const completed = daySpots.filter(s => !!checkedSpots[s.id]).length;
+      const total = daySpots.length;
+      const percent = Math.round((completed / total) * 100);
+
+      document.getElementById('progressText').innerText = `${completed} / ${total} 完成 (${percent}%)`;
+      document.getElementById('progressBar').style.width = `${percent}%`;
+    }
+
+    // 重設全地圖視野
+    function resetMapView() {
+      const daySpots = itineraryData[currentDay].spots;
+      const latlngs = daySpots.map(s => [s.lat, s.lng]);
+      if (latlngs.length > 0) {
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
+      }
+    }
+
+    // 切換路徑線顯示
+    function toggleRouteLine() {
+      showRoute = !showRoute;
+      if (routePolyline) {
+        if (showRoute) {
+          map.addLayer(routePolyline);
+        } else {
+          map.removeLayer(routePolyline);
+        }
+      }
+    }
+
+    // Modal 控制
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // 頁面載入完成初始化
+    window.addEventListener('DOMContentLoaded', initMap);
+  </script>
+</body>
+</html>
