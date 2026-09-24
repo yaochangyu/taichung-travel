@@ -465,12 +465,13 @@
             name: "阿聰師芋頭文化館（觀光工廠）",
             category: "sight",
             categoryName: "觀光工廠",
-            lat: 24.346397,
-            lng: 120.602193,
+            lat: 24.346428,
+            lng: 120.602109,
             transportType: "Ubike 2.0 / 步行",
             transportTime: "騎單車 10-12 分鐘 (2.3km)",
+            address: "台中市大安區福興里興安路168號",
             desc: "免門票參觀！巨型書牆打卡、免費試吃芋頭酥與餅乾、現磨咖啡與熱茶免費喝，享用消暑芋冰與伴手禮。",
-            googleUrl: "https://maps.google.com/?q=24.346397,120.602193&hl=zh-TW"
+            googleUrl: "https://maps.google.com/?q=%E9%98%BF%E8%81%B0%E5%B8%AB%E8%8A%8B%E9%A0%AD%E6%96%87%E5%8C%96%E9%A4%A8%20%E5%8F%B0%E4%B8%AD%E5%B8%82%E5%A4%A7%E5%AE%89%E5%8D%80%E7%A6%8F%E8%88%88%E9%87%8C%E8%88%88%E5%AE%89%E8%B7%AF168%E8%99%9F&hl=zh-TW"
           },
           {
             id: "d1-5",
@@ -758,6 +759,7 @@
               <span class="px-2 py-0.5 rounded text-[10px] font-bold ${spot.category === 'food' ? 'bg-amber-100 text-amber-800' : spot.category === 'transport' ? 'bg-indigo-100 text-indigo-800' : 'bg-sky-100 text-sky-800'}">${spot.categoryName}</span>
             </div>
             <h4 class="font-bold text-sm text-slate-900 leading-snug mb-1">${spot.name}</h4>
+            ${spot.address ? `<p class="text-[11px] text-slate-500 mb-1"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${spot.address}</p>` : ''}
             <p class="text-xs text-slate-600 mb-2 leading-relaxed">${spot.desc}</p>
             <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
               <span><i class="fa-solid fa-person-walking text-slate-400 mr-1"></i>${spot.transportTime}</span>
@@ -797,6 +799,7 @@
               </div>
 
               <h3 class="font-bold text-sm text-slate-900 leading-snug mb-1 ${isChecked ? 'line-through text-slate-500' : ''}">${spot.name}</h3>
+              ${spot.address ? `<p class="text-[11px] text-slate-500 mb-1"><i class="fa-solid fa-location-dot text-slate-400 mr-1"></i>${spot.address}</p>` : ''}
               <p class="text-xs text-slate-600 mb-2.5 leading-relaxed">${spot.desc}</p>
 
               <!-- 隨手筆記區塊 -->
